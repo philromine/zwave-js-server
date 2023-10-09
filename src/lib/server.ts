@@ -466,6 +466,7 @@ interface ZwavejsServerOptions {
   host?: string;
   logger?: Logger;
   enableDNSServiceDiscovery?: boolean;
+  httpServer?: HttpServer;
 }
 
 export interface Logger {
@@ -523,6 +524,7 @@ export class ZwavejsServer extends EventEmitter {
       this,
     );
     this.logger = options.logger ?? console;
+    this.server = options.httpServer;
   }
 
   async start(shouldSetInclusionUserCallbacks: boolean = false) {
@@ -531,7 +533,7 @@ export class ZwavejsServer extends EventEmitter {
     }
 
     this.driver.updateUserAgent({ [applicationName]: version });
-    this.server = createServer();
+    this.server ||= createServer();
     this.wsServer = new ws.Server({
       server: this.server,
       perMessageDeflate: true,
