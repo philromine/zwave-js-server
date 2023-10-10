@@ -466,7 +466,7 @@ interface ZwavejsServerOptions {
   host?: string;
   logger?: Logger;
   enableDNSServiceDiscovery?: boolean;
-  httpServer?: HttpServer;
+  createHttpServer?: () => HttpServer;
 }
 
 export interface Logger {
@@ -502,6 +502,7 @@ export class ZwavejsServerRemoteController {
 }
 
 export class ZwavejsServer extends EventEmitter {
+  private _options: ZwavejsServerOptions = {};
   private server?: HttpServer;
   private wsServer?: ws.Server;
   private sockets?: ClientsController;
@@ -524,7 +525,7 @@ export class ZwavejsServer extends EventEmitter {
       this,
     );
     this.logger = options.logger ?? console;
-    this.server = options.httpServer;
+    this._options = options;
   }
 
   async start(shouldSetInclusionUserCallbacks: boolean = false) {
@@ -532,8 +533,16 @@ export class ZwavejsServer extends EventEmitter {
       throw new Error("Cannot start server when driver not ready");
     }
 
+    const port = this.options.port || this.defaultPort;
+    const host = this.options.host || this.defaultHost;
+    const localEndpointString = this.server
+      ? JSON.stringify(this.server, null, 2)
+      : `${host}:${port}`;
+
     this.driver.updateUserAgent({ [applicationName]: version });
-    this.server ||= createServer();
+    this.server = this._options.createHttpServer
+      ? this._options.createHttpServer()
+      : createServer();
     this.wsServer = new ws.Server({
       server: this.server,
       perMessageDeflate: true,
@@ -548,10 +557,6 @@ export class ZwavejsServer extends EventEmitter {
       this.setInclusionUserCallbacks();
     }
     this.wsServer.on("connection", (socket) => this.sockets!.addSocket(socket));
-
-    const port = this.options.port || this.defaultPort;
-    const host = this.options.host || this.defaultHost;
-    const localEndpointString = `${host}:${port}`;
 
     this.logger.debug(`Starting server on ${localEndpointString}`);
 
